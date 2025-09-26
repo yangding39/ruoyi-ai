@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.ruoyi.common.core.validate.AddGroup;
 import org.ruoyi.common.core.validate.EditGroup;
+import org.ruoyi.constant.KnowledgeProviderType;
 import org.ruoyi.core.domain.BaseEntity;
 import org.ruoyi.domain.KnowledgeInfo;
 
@@ -46,6 +47,12 @@ public class KnowledgeInfoBo extends BaseEntity {
     private String kname;
 
     /**
+     * 知识库提供商类型
+     */
+    @NotNull(message = "知识库提供商类型不能为空", groups = { AddGroup.class, EditGroup.class })
+    private KnowledgeProviderType provider;
+
+    /**
      * 是否公开知识库（0 否 1是）
      */
     @NotNull(message = "是否公开知识库（0 否 1是）不能为空", groups = { AddGroup.class, EditGroup.class })
@@ -74,25 +81,21 @@ public class KnowledgeInfoBo extends BaseEntity {
     /**
      * 知识库中检索的条数
      */
-    @NotNull(message = "知识库中检索的条数不能为空", groups = { AddGroup.class, EditGroup.class })
     private Long retrieveLimit;
 
     /**
      * 文本块大小
      */
-    @NotNull(message = "文本块大小不能为空", groups = { AddGroup.class, EditGroup.class })
     private Long textBlockSize;
 
     /**
      * 向量库模型名称
      */
-    @NotBlank(message = "向量库不能为空", groups = { AddGroup.class, EditGroup.class })
     private String vectorModelName;
 
     /**
      * 向量化模型名称
      */
-    @NotBlank(message = "向量模型不能为空", groups = { AddGroup.class, EditGroup.class })
     private String embeddingModelName;
 
 

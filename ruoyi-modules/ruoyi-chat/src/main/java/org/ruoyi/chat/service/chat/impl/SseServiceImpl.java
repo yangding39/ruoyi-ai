@@ -26,7 +26,6 @@ import org.ruoyi.common.core.utils.file.FileUtils;
 import org.ruoyi.common.core.utils.file.MimeTypeUtils;
 import org.ruoyi.common.satoken.utils.LoginHelper;
 import org.ruoyi.domain.bo.ChatSessionBo;
-import org.ruoyi.domain.bo.QueryVectorBo;
 import org.ruoyi.domain.vo.ChatModelVo;
 import org.ruoyi.domain.vo.KnowledgeInfoVo;
 import org.ruoyi.domain.vo.PromptTemplateVo;
@@ -35,6 +34,9 @@ import org.ruoyi.service.IChatSessionService;
 import org.ruoyi.service.IKnowledgeInfoService;
 import org.ruoyi.service.IPromptTemplateService;
 import org.ruoyi.service.VectorStoreService;
+import org.ruoyi.chat.service.knowledge.UnifiedKnowledgeRetrievalService;
+import org.ruoyi.domain.dto.KnowledgeRetrievalRequestDTO;
+import org.ruoyi.domain.dto.KnowledgeRetrievalResponseDTO;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -62,8 +64,6 @@ public class SseServiceImpl implements ISseService {
 
     private final OpenAiStreamClient openAiStreamClient;
 
-    private final VectorStoreService vectorStoreService;
-
     private final IChatCostService chatCostService;
 
     private final IChatModelService chatModelService;
@@ -73,6 +73,8 @@ public class SseServiceImpl implements ISseService {
     private final IChatSessionService chatSessionService;
 
     private final IKnowledgeInfoService knowledgeInfoService;
+
+    private final UnifiedKnowledgeRetrievalService unifiedKnowledgeRetrievalService;
 
     private ChatModelVo chatModelVo;
 
@@ -270,31 +272,23 @@ public class SseServiceImpl implements ISseService {
         }
 
         try {
-            // 查询知识库信息
-            KnowledgeInfoVo knowledgeInfoVo = knowledgeInfoService.queryById(Long.valueOf(chatRequest.getKid()));
-            if (knowledgeInfoVo == null) {
-                log.warn("知识库信息不存在，kid: {}", chatRequest.getKid());
-                return getPromptTemplatePrompt(promptTemplateEnum.VECTOR.getDesc());
-            }
+            // 构建统一知识库检索请求
+            KnowledgeRetrievalRequestDTO retrievalRequest = buildKnowledgeRetrievalRequest(chatRequest);
 
-            // 查询向量模型配置信息
-            ChatModelVo chatModel = chatModelService.selectModelByName(knowledgeInfoVo.getEmbeddingModelName());
-            if (chatModel == null) {
-                log.warn("向量模型配置不存在，模型名称: {}", knowledgeInfoVo.getEmbeddingModelName());
-                return getPromptTemplatePrompt(promptTemplateEnum.VECTOR.getDesc());
-            }
+            // 使用统一知识库检索服务进行检索（支持本地和外部知识库）
+            List<KnowledgeRetrievalResponseDTO> retrievalResults = unifiedKnowledgeRetrievalService.autoRetrieve(retrievalRequest);
 
-            // 构建向量查询参数
-            QueryVectorBo queryVectorBo = buildQueryVectorBo(chatRequest, knowledgeInfoVo, chatModel);
-
-            // 获取向量查询结果
-            List<String> nearestList = vectorStoreService.getQueryVector(queryVectorBo);
+            // 提取内容并添加到消息上下文
+            List<String> contentList = retrievalResults.stream()
+                    .map(KnowledgeRetrievalResponseDTO::getContent)
+                    .filter(content -> content != null && !content.trim().isEmpty())
+                    .toList();
 
             // 添加知识库消息到上下文
-            addKnowledgeMessages(messages, nearestList);
+            addKnowledgeMessages(messages, contentList);
 
-            // 返回知识库系统提示词
-            return getKnowledgeSystemPrompt(knowledgeInfoVo);
+            // 返回知识库系统提示词，优先尝试获取本地知识库的提示词
+            return getKnowledgeSystemPromptFromLocal(chatRequest.getKid());
 
         } catch (Exception e) {
             log.error("处理知识库信息失败: {}", e.getMessage(), e);
@@ -303,22 +297,64 @@ public class SseServiceImpl implements ISseService {
     }
 
     /**
-     * 构建向量查询参数
+     * 构建知识库检索请求
      */
-    private QueryVectorBo buildQueryVectorBo(ChatRequest chatRequest, KnowledgeInfoVo knowledgeInfoVo,
-                                             ChatModelVo chatModel) {
+    private KnowledgeRetrievalRequestDTO buildKnowledgeRetrievalRequest(ChatRequest chatRequest) {
         String content = chatRequest.getMessages().get(chatRequest.getMessages().size() - 1).getContent().toString();
 
-        QueryVectorBo queryVectorBo = new QueryVectorBo();
-        queryVectorBo.setQuery(content);
-        queryVectorBo.setKid(chatRequest.getKid());
-        queryVectorBo.setApiKey(chatModel.getApiKey());
-        queryVectorBo.setBaseUrl(chatModel.getApiHost());
-        queryVectorBo.setVectorModelName(knowledgeInfoVo.getVectorModelName());
-        queryVectorBo.setEmbeddingModelName(knowledgeInfoVo.getEmbeddingModelName());
-        queryVectorBo.setMaxResults(knowledgeInfoVo.getRetrieveLimit());
+        KnowledgeRetrievalRequestDTO request = new KnowledgeRetrievalRequestDTO();
+        request.setQuery(content);
+        request.setKnowledgeId(chatRequest.getKid());
 
-        return queryVectorBo;
+        // 设置默认的topK，如果是本地知识库且能查到配置则使用配置的值
+        Integer topK = getTopKFromLocalKnowledge(chatRequest.getKid());
+        request.setTopK(topK != null ? topK : 5); // 默认返回5个结果
+
+        return request;
+    }
+
+    /**
+     * 从本地知识库获取topK配置
+     */
+    private Integer getTopKFromLocalKnowledge(String kid) {
+        try {
+            KnowledgeInfoVo knowledgeInfoVo = knowledgeInfoService.queryById(Long.valueOf(kid));
+            return knowledgeInfoVo != null ? knowledgeInfoVo.getRetrieveLimit() : null;
+        } catch (Exception e) {
+            // 如果解析为Long失败或查询失败，可能是外部知识库ID，返回null使用默认值
+            return null;
+        }
+    }
+
+    /**
+     * 获取知识库系统提示词，优先从本地知识库获取
+     */
+    private String getKnowledgeSystemPromptFromLocal(String kid) {
+        try {
+            KnowledgeInfoVo knowledgeInfoVo = knowledgeInfoService.queryById(Long.valueOf(kid));
+            if (knowledgeInfoVo != null) {
+                return getKnowledgeSystemPrompt(knowledgeInfoVo);
+            }
+        } catch (Exception e) {
+            // 如果是外部知识库或查询失败，使用默认提示词
+            log.debug("无法从本地知识库获取系统提示词，使用默认提示词: {}", e.getMessage());
+        }
+
+        // 返回默认的知识库系统提示词
+        return getDefaultKnowledgeSystemPrompt();
+    }
+
+    /**
+     * 获取默认的知识库系统提示词
+     */
+    private String getDefaultKnowledgeSystemPrompt() {
+        return "###角色设定\n" +
+                "你是一个智能知识助手，专注于利用上下文中的信息来提供准确和相关的回答。\n" +
+                "###指令\n" +
+                "当用户的问题与上下文知识匹配时，利用上下文信息进行回答。如果问题与上下文不匹配，运用自身的推理能力生成合适的回答。\n" +
+                "###限制\n" +
+                "确保回答清晰简洁，避免提供不必要的细节。始终保持语气友好\n" +
+                "当前时间：" + DateUtils.getDate();
     }
 
     /**

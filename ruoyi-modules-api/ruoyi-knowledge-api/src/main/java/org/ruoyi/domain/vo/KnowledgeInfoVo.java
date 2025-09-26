@@ -7,6 +7,7 @@ import io.github.linpeilie.annotations.AutoMapper;
 import lombok.Data;
 import org.ruoyi.common.excel.annotation.ExcelDictFormat;
 import org.ruoyi.common.excel.convert.ExcelDictConvert;
+import org.ruoyi.constant.KnowledgeProviderType;
 import org.ruoyi.domain.KnowledgeInfo;
 
 import java.io.Serial;
@@ -52,6 +53,12 @@ public class KnowledgeInfoVo implements Serializable {
      */
     @ExcelProperty(value = "知识库名称")
     private String kname;
+
+    /**
+     * 知识库提供商类型
+     */
+    @ExcelProperty(value = "知识库类型")
+    private KnowledgeProviderType provider;
 
     /**
      * 是否公开知识库（0 否 1是）

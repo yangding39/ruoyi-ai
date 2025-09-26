@@ -10,6 +10,7 @@ import org.ruoyi.common.chat.openai.interceptor.OpenAILogger;
 import org.ruoyi.common.core.service.ConfigService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
