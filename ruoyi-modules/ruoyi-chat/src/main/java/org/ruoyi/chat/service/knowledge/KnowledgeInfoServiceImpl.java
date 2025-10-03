@@ -13,6 +13,8 @@ import org.ruoyi.common.core.domain.model.LoginUser;
 import org.ruoyi.common.core.utils.MapstructUtils;
 import org.ruoyi.common.core.utils.StringUtils;
 import org.ruoyi.common.satoken.utils.LoginHelper;
+import org.ruoyi.common.tenant.helper.TenantHelper;
+import org.ruoyi.constant.KnowledgeProviderType;
 import org.ruoyi.core.page.PageQuery;
 import org.ruoyi.core.page.TableDataInfo;
 import org.ruoyi.domain.*;
@@ -57,6 +59,8 @@ public class KnowledgeInfoServiceImpl implements IKnowledgeInfoService {
     private final KnowledgeFragmentMapper fragmentMapper;
 
     private final KnowledgeAttachMapper attachMapper;
+
+    private final ExternalKnowledgeBindingMapper externalKnowledgeBindingMapper;
 
     private final IChatModelService chatModelService;
 
@@ -215,9 +219,30 @@ public class KnowledgeInfoServiceImpl implements IKnowledgeInfoService {
                 knowledgeInfo.setUid(LoginHelper.getLoginUser().getUserId());
             }
             baseMapper.insert(knowledgeInfo);
+
+            // 根据provider类型进行不同处理
             if (knowledgeInfo != null) {
-                vectorStoreService.createSchema(String.valueOf(knowledgeInfo.getId()),
+                if (KnowledgeProviderType.EXTERNAL.equals(knowledgeInfo.getProvider())) {
+                    // 外部知识库：保存绑定关系
+                    if (bo.getExternalKnowledgeApiId() != null && StringUtils.isNotBlank(bo.getExternalKnowledgeId())) {
+                        ExternalKnowledgeBinding binding = new ExternalKnowledgeBinding();
+                        binding.setDatasetId(knowledgeInfo.getId());
+                        binding.setExternalKnowledgeApiId(bo.getExternalKnowledgeApiId());
+                        binding.setExternalKnowledgeId(bo.getExternalKnowledgeId());
+                        binding.setTenantId(TenantHelper.getTenantId());
+
+                        externalKnowledgeBindingMapper.insert(binding);
+                        log.info("保存外部知识库绑定成功: datasetId={}, externalKnowledgeId={}",
+                            knowledgeInfo.getId(), bo.getExternalKnowledgeId());
+                    } else {
+                        log.warn("外部知识库配置信息不完整: externalKnowledgeApiId={}, externalKnowledgeId={}",
+                            bo.getExternalKnowledgeApiId(), bo.getExternalKnowledgeId());
+                    }
+                } else {
+                    // 本地知识库：创建向量库schema
+                    vectorStoreService.createSchema(String.valueOf(knowledgeInfo.getId()),
                         bo.getVectorModelName());
+                }
             }
         } else {
             baseMapper.updateById(knowledgeInfo);

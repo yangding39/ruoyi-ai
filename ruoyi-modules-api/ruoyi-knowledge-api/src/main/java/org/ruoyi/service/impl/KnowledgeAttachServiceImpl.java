@@ -46,6 +46,16 @@ public class KnowledgeAttachServiceImpl implements IKnowledgeAttachService {
   }
 
   /**
+   * 根据文档ID查询知识库附件
+   */
+  @Override
+  public KnowledgeAttachVo queryByDocId(String docId) {
+    LambdaQueryWrapper<KnowledgeAttach> wrapper = Wrappers.lambdaQuery();
+    wrapper.eq(KnowledgeAttach::getDocId, docId);
+    return baseMapper.selectVoOne(wrapper);
+  }
+
+  /**
    * 查询知识库附件列表
    */
   @Override

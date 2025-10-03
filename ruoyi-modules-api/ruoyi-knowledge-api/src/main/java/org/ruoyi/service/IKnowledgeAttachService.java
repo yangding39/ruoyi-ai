@@ -24,6 +24,11 @@ public interface IKnowledgeAttachService {
     KnowledgeAttachVo queryById(Long id);
 
     /**
+     * 根据文档ID查询知识库附件
+     */
+    KnowledgeAttachVo queryByDocId(String docId);
+
+    /**
      * 查询知识库附件列表
      */
     TableDataInfo<KnowledgeAttachVo> queryPageList(KnowledgeAttachBo bo, PageQuery pageQuery);

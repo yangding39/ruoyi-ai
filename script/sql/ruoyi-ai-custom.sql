@@ -54,3 +54,30 @@ CREATE TABLE `external_knowledge_bindings`  (
                                                 INDEX `idx_tenant_id`(`tenant_id`) USING BTREE,
                                                 CONSTRAINT `fk_external_knowledge_api` FOREIGN KEY (`external_knowledge_api_id`) REFERENCES `external_knowledge_apis` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '外部知识库绑定关系表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Menu and Permission Configuration for External Knowledge API
+-- ----------------------------
+
+-- Generate menu ID: 1950000000000000001 (incrementing from existing IDs)
+-- Parent menu ID: 1775500307898949634 (运营管理)
+
+-- Main menu item: 外部知识库API
+INSERT INTO `sys_menu` VALUES (1950000000000000001, '外部知识库API', 1775500307898949634, 11, 'externalKnowledgeApi', 'operator/externalKnowledgeApi/index', '', 1, 0, 'C', '0', '0', 'operator:externalKnowledgeApi:list', 'carbon:api', 103, 1, NOW(), 1, NOW(), '外部知识库API管理菜单');
+
+-- Permission buttons
+INSERT INTO `sys_menu` VALUES (1950000000000000002, '外部知识库API查询', 1950000000000000001, 1, '#', '', NULL, 1, 0, 'F', '0', '0', 'operator:externalKnowledgeApi:query', '#', 103, 1, NOW(), NULL, NULL, '');
+INSERT INTO `sys_menu` VALUES (1950000000000000003, '外部知识库API新增', 1950000000000000001, 2, '#', '', NULL, 1, 0, 'F', '0', '0', 'operator:externalKnowledgeApi:add', '#', 103, 1, NOW(), NULL, NULL, '');
+INSERT INTO `sys_menu` VALUES (1950000000000000004, '外部知识库API修改', 1950000000000000001, 3, '#', '', NULL, 1, 0, 'F', '0', '0', 'operator:externalKnowledgeApi:edit', '#', 103, 1, NOW(), NULL, NULL, '');
+INSERT INTO `sys_menu` VALUES (1950000000000000005, '外部知识库API删除', 1950000000000000001, 4, '#', '', NULL, 1, 0, 'F', '0', '0', 'operator:externalKnowledgeApi:remove', '#', 103, 1, NOW(), NULL, NULL, '');
+INSERT INTO `sys_menu` VALUES (1950000000000000006, '外部知识库API验证', 1950000000000000001, 5, '#', '', NULL, 1, 0, 'F', '0', '0', 'operator:externalKnowledgeApi:validate', '#', 103, 1, NOW(), NULL, NULL, '');
+
+-- ----------------------------
+-- Assign menus to role (Role ID 2 = 普通角色/Common Role)
+-- ----------------------------
+INSERT INTO `sys_role_menu` VALUES (2, 1950000000000000001);
+INSERT INTO `sys_role_menu` VALUES (2, 1950000000000000002);
+INSERT INTO `sys_role_menu` VALUES (2, 1950000000000000003);
+INSERT INTO `sys_role_menu` VALUES (2, 1950000000000000004);
+INSERT INTO `sys_role_menu` VALUES (2, 1950000000000000005);
+INSERT INTO `sys_role_menu` VALUES (2, 1950000000000000006);

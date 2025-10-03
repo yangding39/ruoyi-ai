@@ -10,27 +10,27 @@ public enum KnowledgeProviderType {
     /**
      * 本地知识库
      */
-    LOCAL("local", "本地知识库"),
+    LOCAL("LOCAL", "本地知识库"),
 
     /**
      * 外部知识库
      */
-    EXTERNAL("external", "外部知识库"),
+    EXTERNAL("EXTERNAL", "外部知识库"),
 
     /**
      * FastGPT知识库
      */
-    FASTGPT("fastgpt", "FastGPT知识库"),
+    FASTGPT("FASTGPT", "FastGPT知识库"),
 
     /**
      * DIFY知识库
      */
-    DIFY("dify", "DIFY知识库"),
+    DIFY("DIFY", "DIFY知识库"),
 
     /**
      * Coze知识库
      */
-    COZE("coze", "Coze知识库");
+    COZE("COZE", "Coze知识库");
 
     private final String code;
     private final String description;

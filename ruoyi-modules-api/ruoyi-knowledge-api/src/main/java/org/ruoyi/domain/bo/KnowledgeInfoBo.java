@@ -109,4 +109,14 @@ public class KnowledgeInfoBo extends BaseEntity {
      */
     private String remark;
 
+    /**
+     * 外部知识库API配置ID（当provider为EXTERNAL时使用）
+     */
+    private Long externalKnowledgeApiId;
+
+    /**
+     * 外部知识库ID（当provider为EXTERNAL时使用）
+     */
+    private String externalKnowledgeId;
+
 }

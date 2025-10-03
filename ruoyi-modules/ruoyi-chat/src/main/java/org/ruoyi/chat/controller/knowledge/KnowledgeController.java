@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.ruoyi.chat.config.KnowledgeRoleConfig;
+import org.ruoyi.chat.service.knowledge.UnifiedKnowledgeRetrievalService;
 import org.ruoyi.common.core.domain.R;
 import org.ruoyi.common.core.validate.AddGroup;
 import org.ruoyi.common.excel.utils.ExcelUtil;
@@ -19,7 +20,6 @@ import org.ruoyi.core.page.TableDataInfo;
 import org.ruoyi.domain.bo.KnowledgeAttachBo;
 import org.ruoyi.domain.bo.KnowledgeFragmentBo;
 import org.ruoyi.domain.bo.KnowledgeInfoBo;
-import org.ruoyi.domain.bo.KnowledgeInfoUploadBo;
 import org.ruoyi.domain.vo.KnowledgeAttachVo;
 import org.ruoyi.domain.vo.KnowledgeFragmentVo;
 import org.ruoyi.domain.vo.KnowledgeInfoVo;
@@ -31,7 +31,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -53,6 +55,8 @@ public class KnowledgeController extends BaseController {
     private final IKnowledgeFragmentService fragmentService;
 
     private final KnowledgeRoleConfig knowledgeRoleConfig;
+
+    private final UnifiedKnowledgeRetrievalService unifiedKnowledgeRetrievalService;
 
     /**
      * 根据用户信息查询本地知识库
@@ -133,17 +137,33 @@ public class KnowledgeController extends BaseController {
     @GetMapping("/detail/{kid}")
     public TableDataInfo<KnowledgeAttachVo> attach(KnowledgeAttachBo bo, PageQuery pageQuery,
                                                    @PathVariable String kid) {
-        bo.setKid(kid);
-        return attachService.queryPageList(bo, pageQuery);
+        // 使用统一知识库服务查询文档列表，支持本地和外部知识库
+        return unifiedKnowledgeRetrievalService.listDocuments(
+            kid,
+            pageQuery.getPageNum(),
+            pageQuery.getPageSize(),
+            pageQuery.getOrderByColumn(),
+            "desc".equalsIgnoreCase(pageQuery.getIsAsc()),
+            bo.getDocName()
+        );
     }
 
     /**
      * 上传知识库附件
      */
     @PostMapping(value = "/attach/upload")
-    public R<String> upload(KnowledgeInfoUploadBo bo) throws Exception {
-        knowledgeInfoService.upload(bo);
-        return R.ok("上传知识库附件成功!");
+    public R<Map<String, Object>> upload(@RequestParam("kid") String kid,
+                                          @RequestParam("file") MultipartFile file) throws Exception {
+        // 使用统一知识库上传服务
+        Map<String, Object> result = unifiedKnowledgeRetrievalService.uploadFile(kid, file);
+
+        Boolean success = (Boolean) result.get("success");
+        if (success != null && success) {
+            return R.ok(result);
+        } else {
+            String message = (String) result.getOrDefault("message", "上传失败");
+            return R.fail(message);
+        }
     }
 
     /**
@@ -158,13 +178,31 @@ public class KnowledgeController extends BaseController {
     }
 
     /**
-     * 删除知识库附件
+     * 删除知识库附件（旧版本，保留兼容性）
      */
     @PostMapping("attach/remove/{kid}")
     public R<Void> removeAttach(@NotEmpty(message = "主键不能为空")
                                 @PathVariable String kid) {
         attachService.removeKnowledgeAttach(kid);
         return R.ok();
+    }
+
+    /**
+     * 删除知识库文档（统一接口，支持本地和外部知识库）
+     */
+    @PostMapping("attach/delete/{knowledgeId}/{docId}")
+    public R<Void> deleteAttach(@NotEmpty(message = "知识库ID不能为空") @PathVariable String knowledgeId,
+                                @NotEmpty(message = "文档ID不能为空") @PathVariable String docId) {
+        // 使用统一知识库服务删除文档，支持本地和外部知识库
+        Map<String, Object> result = unifiedKnowledgeRetrievalService.deleteDocument(knowledgeId, docId);
+
+        Boolean success = (Boolean) result.get("success");
+        if (success != null && success) {
+            return R.ok();
+        } else {
+            String message = (String) result.getOrDefault("message", "删除失败");
+            return R.fail(message);
+        }
     }
 
 
