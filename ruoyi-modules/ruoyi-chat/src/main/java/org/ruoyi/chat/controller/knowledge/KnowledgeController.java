@@ -207,13 +207,36 @@ public class KnowledgeController extends BaseController {
 
 
     /**
-     * 查询知识片段
+     * 查询知识片段（支持本地和外部知识库）
      */
     @GetMapping("/fragment/list/{docId}")
     public TableDataInfo<KnowledgeFragmentVo> fragmentList(KnowledgeFragmentBo bo,
                                                            PageQuery pageQuery, @PathVariable String docId) {
-        bo.setDocId(docId);
-        return fragmentService.queryPageList(bo, pageQuery);
+        // 从bo获取知识库ID，如果没有则尝试从文档ID关联查询
+        String knowledgeId = bo.getKid();
+
+        // 如果BO中没有知识库ID，需要通过文档ID查询获取
+        // 这里假设前端会传递kid参数，如果没有则返回空结果
+        if (knowledgeId == null || knowledgeId.trim().isEmpty()) {
+            // 尝试通过文档ID从本地附件表查询知识库ID
+            KnowledgeAttachVo attachVo = attachService.queryByDocId(docId);
+            if (attachVo != null && attachVo.getKid() != null) {
+                knowledgeId = attachVo.getKid();
+            } else {
+                // 无法确定知识库ID，返回空结果
+                return new TableDataInfo<>(new java.util.ArrayList<>(), 0L);
+            }
+        }
+
+        // 使用统一知识库服务查询片段列表，支持本地和外部知识库
+        return unifiedKnowledgeRetrievalService.listChunks(
+            knowledgeId,
+            docId,
+            pageQuery.getPageNum(),
+            pageQuery.getPageSize(),
+            null, // keywords参数，当前BO中没有，可以扩展
+            null  // chunkId参数，当前BO中没有，可以扩展
+        );
     }
 
     /**

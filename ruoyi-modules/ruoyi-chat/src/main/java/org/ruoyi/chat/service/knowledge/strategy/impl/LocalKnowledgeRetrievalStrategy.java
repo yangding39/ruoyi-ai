@@ -6,12 +6,14 @@ import org.ruoyi.constant.KnowledgeProviderType;
 import org.ruoyi.core.page.PageQuery;
 import org.ruoyi.core.page.TableDataInfo;
 import org.ruoyi.domain.bo.KnowledgeAttachBo;
+import org.ruoyi.domain.bo.KnowledgeFragmentBo;
 import org.ruoyi.domain.bo.KnowledgeInfoUploadBo;
 import org.ruoyi.domain.bo.QueryVectorBo;
 import org.ruoyi.domain.dto.KnowledgeRetrievalRequestDTO;
 import org.ruoyi.domain.dto.KnowledgeRetrievalResponseDTO;
 import org.ruoyi.domain.vo.ChatModelVo;
 import org.ruoyi.domain.vo.KnowledgeAttachVo;
+import org.ruoyi.domain.vo.KnowledgeFragmentVo;
 import org.ruoyi.domain.vo.KnowledgeInfoVo;
 import org.ruoyi.service.*;
 import org.springframework.stereotype.Component;
@@ -36,6 +38,7 @@ public class LocalKnowledgeRetrievalStrategy implements KnowledgeRetrievalStrate
     private final IChatModelService chatModelService;
     private final VectorStoreService vectorStoreService;
     private final IKnowledgeAttachService knowledgeAttachService;
+    private final IKnowledgeFragmentService knowledgeFragmentService;
 
     @Override
     public KnowledgeProviderType getSupportedType() {
@@ -239,6 +242,46 @@ public class LocalKnowledgeRetrievalStrategy implements KnowledgeRetrievalStrate
                 knowledgeId, documentId, e.getMessage(), e);
             result.put("success", false);
             result.put("message", "文档删除失败: " + e.getMessage());
+        }
+
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> listChunks(String knowledgeId, String documentId, Integer pageNum,
+                                          Integer pageSize, String keywords, String chunkId) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            // 构建查询BO
+            KnowledgeFragmentBo bo = new KnowledgeFragmentBo();
+            bo.setDocId(documentId);
+
+            // 如果有片段ID，设置查询条件
+            if (chunkId != null && !chunkId.trim().isEmpty()) {
+                bo.setFid(chunkId);
+            }
+
+            // 构建分页查询 - 默认pageSize为10000
+            PageQuery pageQuery = new PageQuery(
+                pageSize != null && pageSize > 0 ? pageSize : 10000,
+                pageNum != null && pageNum > 0 ? pageNum : 1
+            );
+
+            // 调用本地服务查询片段列表
+            TableDataInfo<KnowledgeFragmentVo> tableData = knowledgeFragmentService.queryPageList(bo, pageQuery);
+
+            log.info("本地知识库片段列表查询成功: knowledgeId={}, documentId={}, total={}",
+                knowledgeId, documentId, tableData.getTotal());
+
+            result.put("success", true);
+            result.put("rows", tableData.getRows());
+            result.put("total", tableData.getTotal());
+
+        } catch (Exception e) {
+            log.error("本地知识库片段列表查询失败: knowledgeId={}, documentId={}, error={}",
+                knowledgeId, documentId, e.getMessage(), e);
+            result.put("success", false);
+            result.put("message", "片段列表查询失败: " + e.getMessage());
         }
 
         return result;

@@ -69,4 +69,18 @@ public interface KnowledgeRetrievalStrategy {
      * @return 删除结果
      */
     Map<String, Object> deleteDocument(String knowledgeId, String documentId);
+
+    /**
+     * 查询知识库文档的片段列表
+     *
+     * @param knowledgeId 知识库ID
+     * @param documentId 文档ID
+     * @param pageNum 页码
+     * @param pageSize 每页数量
+     * @param keywords 关键词
+     * @param chunkId 片段ID
+     * @return 片段列表结果
+     */
+    Map<String, Object> listChunks(String knowledgeId, String documentId, Integer pageNum,
+                                   Integer pageSize, String keywords, String chunkId);
 }

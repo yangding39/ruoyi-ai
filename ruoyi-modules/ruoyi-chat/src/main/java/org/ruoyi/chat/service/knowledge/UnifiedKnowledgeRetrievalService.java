@@ -7,6 +7,7 @@ import org.ruoyi.core.page.TableDataInfo;
 import org.ruoyi.domain.dto.KnowledgeRetrievalRequestDTO;
 import org.ruoyi.domain.dto.KnowledgeRetrievalResponseDTO;
 import org.ruoyi.domain.vo.KnowledgeAttachVo;
+import org.ruoyi.domain.vo.KnowledgeFragmentVo;
 import org.ruoyi.domain.vo.KnowledgeInfoVo;
 import org.ruoyi.service.IKnowledgeAttachService;
 import org.ruoyi.service.IKnowledgeInfoService;
@@ -368,6 +369,82 @@ public class UnifiedKnowledgeRetrievalService {
         } catch (Exception e) {
             log.error("通过文档ID删除失败: documentId={}, error={}", documentId, e.getMessage(), e);
             return Map.of("success", false, "message", "删除失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 统一片段列表查询接口
+     * 根据知识库类型自动选择查询策略
+     *
+     * @param knowledgeId 知识库ID
+     * @param documentId 文档ID
+     * @param pageNum 页码
+     * @param pageSize 每页数量（默认10000）
+     * @param keywords 关键词
+     * @param chunkId 片段ID
+     * @return 片段列表结果（TableDataInfo格式）
+     */
+    public TableDataInfo<KnowledgeFragmentVo> listChunks(String knowledgeId, String documentId,
+                                                          Integer pageNum, Integer pageSize,
+                                                          String keywords, String chunkId) {
+        try {
+            // 检测知识库类型
+            KnowledgeProviderType providerType = detectKnowledgeProviderType(knowledgeId);
+
+            // 获取对应的检索策略
+            KnowledgeRetrievalStrategy strategy = getRetrievalStrategy(providerType);
+            if (strategy == null) {
+                log.warn("未找到知识库类型 {} 对应的策略", providerType);
+                return new TableDataInfo<>(new ArrayList<>(), 0L);
+            }
+
+            // 验证配置
+            if (!strategy.validateConfiguration(knowledgeId)) {
+                log.warn("知识库配置验证失败: type={}, knowledgeId={}", providerType, knowledgeId);
+                return new TableDataInfo<>(new ArrayList<>(), 0L);
+            }
+
+            // 如果前端没传page_size，设置默认值为10000
+            Integer effectivePageSize = (pageSize != null && pageSize > 0) ? pageSize : 10000;
+
+            // 执行查询
+            Map<String, Object> result = strategy.listChunks(knowledgeId, documentId, pageNum,
+                effectivePageSize, keywords, chunkId);
+
+            Boolean success = (Boolean) result.get("success");
+            if (success != null && success) {
+                // 成功获取数据
+                Object rowsObj = result.get("rows");
+                List<KnowledgeFragmentVo> rows = new ArrayList<>();
+                if (rowsObj instanceof List<?>) {
+                    @SuppressWarnings("unchecked")
+                    List<KnowledgeFragmentVo> list = (List<KnowledgeFragmentVo>) rowsObj;
+                    rows = list;
+                }
+
+                Object totalObj = result.get("total");
+                Long total = 0L;
+                if (totalObj instanceof Integer) {
+                    total = ((Integer) totalObj).longValue();
+                } else if (totalObj instanceof Long) {
+                    total = (Long) totalObj;
+                }
+
+                log.info("片段列表查询完成: type={}, knowledgeId={}, documentId={}, total={}",
+                    providerType, knowledgeId, documentId, total);
+                return new TableDataInfo<>(rows, total);
+            } else {
+                // 查询失败
+                String message = (String) result.getOrDefault("message", "查询失败");
+                log.warn("片段列表查询失败: type={}, knowledgeId={}, documentId={}, message={}",
+                    providerType, knowledgeId, documentId, message);
+                return new TableDataInfo<>(new ArrayList<>(), 0L);
+            }
+
+        } catch (Exception e) {
+            log.error("片段列表查询失败: knowledgeId={}, documentId={}, error={}",
+                knowledgeId, documentId, e.getMessage(), e);
+            return new TableDataInfo<>(new ArrayList<>(), 0L);
         }
     }
 }

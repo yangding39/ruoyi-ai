@@ -7,11 +7,13 @@ import okhttp3.*;
 import org.ruoyi.common.core.utils.OkHttpUtil;
 import org.ruoyi.common.core.utils.StringUtils;
 import org.ruoyi.constant.KnowledgeProviderType;
+import org.ruoyi.core.page.TableDataInfo;
 import org.ruoyi.domain.ExternalKnowledgeApi;
 import org.ruoyi.domain.ExternalKnowledgeBinding;
 import org.ruoyi.domain.dto.KnowledgeRetrievalRequestDTO;
 import org.ruoyi.domain.dto.KnowledgeRetrievalResponseDTO;
 import org.ruoyi.domain.vo.KnowledgeAttachVo;
+import org.ruoyi.domain.vo.KnowledgeFragmentVo;
 import org.ruoyi.mapper.ExternalKnowledgeApiMapper;
 import org.ruoyi.mapper.ExternalKnowledgeBindingMapper;
 import org.ruoyi.service.KnowledgeRetrievalStrategy;
@@ -733,6 +735,216 @@ public class ExternalKnowledgeRetrievalStrategy implements KnowledgeRetrievalStr
                 knowledgeId, documentId, e.getMessage(), e);
             result.put("success", false);
             result.put("message", "文档删除失败: " + e.getMessage());
+        }
+
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> listChunks(String knowledgeId, String documentId, Integer pageNum,
+                                          Integer pageSize, String keywords, String chunkId) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            // 获取外部知识库绑定信息
+            ExternalKnowledgeBinding binding = externalKnowledgeBindingMapper.selectByDatasetId(Long.valueOf(knowledgeId));
+            if (binding == null) {
+                log.warn("未找到外部知识库绑定信息: knowledgeId={}", knowledgeId);
+                result.put("success", false);
+                result.put("message", "未找到外部知识库绑定信息");
+                return result;
+            }
+
+            // 获取API配置
+            ExternalKnowledgeApi apiConfig = externalKnowledgeApiMapper.selectById(binding.getExternalKnowledgeApiId());
+            if (apiConfig == null) {
+                log.warn("未找到外部知识库API配置: apiId={}", binding.getExternalKnowledgeApiId());
+                result.put("success", false);
+                result.put("message", "未找到外部知识库API配置");
+                return result;
+            }
+
+            // 验证API配置
+            Map<String, Object> settings = apiConfig.getSettingsDict();
+            String endpoint = (String) settings.get("endpoint");
+            String apiKey = (String) settings.get("api_key");
+
+            if (StringUtils.isEmpty(endpoint) || StringUtils.isEmpty(apiKey)) {
+                log.warn("外部知识库API配置不完整: endpoint={}, apiKey={}", endpoint, apiKey != null);
+                result.put("success", false);
+                result.put("message", "外部知识库API配置不完整");
+                return result;
+            }
+
+            // 构建查询URL - 使用RAGFlow的List chunks API
+            // GET /api/v1/datasets/{dataset_id}/documents/{document_id}/chunks
+            StringBuilder urlBuilder = new StringBuilder(endpoint)
+                .append("/datasets/")
+                .append(binding.getExternalKnowledgeId())
+                .append("/documents/")
+                .append(documentId)
+                .append("/chunks");
+
+            // 添加查询参数
+            List<String> queryParams = new ArrayList<>();
+            if (pageNum != null && pageNum > 0) {
+                queryParams.add("page=" + pageNum);
+            }
+            // 如果前端没传page_size，设置默认值为10000
+            int effectivePageSize = (pageSize != null && pageSize > 0) ? pageSize : 10000;
+            queryParams.add("page_size=" + effectivePageSize);
+
+            if (keywords != null && !keywords.trim().isEmpty()) {
+                queryParams.add("keywords=" + keywords);
+            }
+            if (chunkId != null && !chunkId.trim().isEmpty()) {
+                queryParams.add("id=" + chunkId);
+            }
+
+            if (!queryParams.isEmpty()) {
+                urlBuilder.append("?").append(String.join("&", queryParams));
+            }
+
+            String listUrl = urlBuilder.toString();
+
+            // 构建请求
+            Request request = new Request.Builder()
+                .url(listUrl)
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .get()
+                .build();
+
+            // 发送请求
+            try (Response response = okHttpClient.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    log.error("外部知识库片段列表API调用失败: code={}, message={}",
+                        response.code(), response.message());
+                    result.put("success", false);
+                    result.put("message", "外部知识库API调用失败: " + response.message());
+                    return result;
+                }
+
+                String responseBody = response.body() != null ? response.body().string() : "";
+                if (StringUtils.isNotEmpty(responseBody)) {
+                    // 解析响应
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> responseMap = objectMapper.readValue(responseBody, Map.class);
+
+                    Integer code = (Integer) responseMap.get("code");
+                    if (code != null && code == 0) {
+                        // 获取数据部分
+                        Object dataObj = responseMap.get("data");
+                        if (dataObj instanceof Map<?, ?> dataMap) {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> data = (Map<String, Object>) dataMap;
+
+                            // 获取片段列表和总数
+                            Object chunksObj = data.get("chunks");
+                            Object totalObj = data.get("total");
+
+                            // 将外部知识库的片段列表转换为KnowledgeFragmentVo列表（适配器模式）
+                            List<KnowledgeFragmentVo> fragmentVoList = convertExternalChunksToFragmentVo(
+                                chunksObj, knowledgeId, documentId);
+
+                            // 使用TableDataInfo的带参数构造方法构建分页对象
+                            Long total = 0L;
+                            if (totalObj instanceof Integer) {
+                                total = ((Integer) totalObj).longValue();
+                            } else if (totalObj instanceof Long) {
+                                total = (Long) totalObj;
+                            }
+
+                            TableDataInfo<KnowledgeFragmentVo> tableData = new TableDataInfo<>(fragmentVoList, total);
+
+                            log.info("外部知识库片段列表查询成功: knowledgeId={}, documentId={}, total={}",
+                                knowledgeId, documentId, tableData.getTotal());
+
+                            result.put("success", true);
+                            result.put("rows", tableData.getRows());
+                            result.put("total", tableData.getTotal());
+                        } else {
+                            result.put("success", false);
+                            result.put("message", "外部知识库API返回数据格式错误");
+                        }
+                    } else {
+                        String errorMsg = (String) responseMap.getOrDefault("message", "查询失败");
+                        log.error("外部知识库API返回错误: code={}, message={}", code, errorMsg);
+                        result.put("success", false);
+                        result.put("message", "外部知识库API返回错误: " + errorMsg);
+                    }
+                } else {
+                    log.warn("外部知识库API响应为空");
+                    result.put("success", false);
+                    result.put("message", "外部知识库API响应为空");
+                }
+            }
+
+        } catch (IOException e) {
+            log.error("外部知识库片段列表查询IO异常: knowledgeId={}, documentId={}, error={}",
+                knowledgeId, documentId, e.getMessage(), e);
+            result.put("success", false);
+            result.put("message", "片段列表查询IO异常: " + e.getMessage());
+        } catch (Exception e) {
+            log.error("外部知识库片段列表查询失败: knowledgeId={}, documentId={}, error={}",
+                knowledgeId, documentId, e.getMessage(), e);
+            result.put("success", false);
+            result.put("message", "片段列表查询失败: " + e.getMessage());
+        }
+
+        return result;
+    }
+
+    /**
+     * 将外部知识库片段数据转换为KnowledgeFragmentVo列表
+     * 使用适配器模式统一不同数据源的字段映射
+     *
+     * @param chunksObj 外部知识库返回的片段列表对象
+     * @param knowledgeId 知识库ID
+     * @param documentId 文档ID
+     * @return KnowledgeFragmentVo列表
+     */
+    private List<KnowledgeFragmentVo> convertExternalChunksToFragmentVo(Object chunksObj, String knowledgeId, String documentId) {
+        List<KnowledgeFragmentVo> result = new ArrayList<>();
+
+        if (!(chunksObj instanceof List<?>)) {
+            return result;
+        }
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> chunks = (List<Map<String, Object>>) chunksObj;
+
+        int index = 0;
+        for (Map<String, Object> chunk : chunks) {
+            KnowledgeFragmentVo vo = new KnowledgeFragmentVo();
+
+            // 映射字段：外部知识库 -> KnowledgeFragmentVo
+            // id -> fid (外部知识库的片段ID作为fid)
+            vo.setFid(String.valueOf(chunk.getOrDefault("id", "")));
+
+            // 设置知识库ID和文档ID
+            vo.setKid(knowledgeId);
+            vo.setDocId(documentId);
+
+            // content -> content (片段内容)
+            vo.setContent(String.valueOf(chunk.getOrDefault("content", "")));
+
+            // 设置片段索引
+            vo.setIdx((long) index++);
+
+            // 构建备注信息：包含外部知识库的元数据
+            StringBuilder remark = new StringBuilder("外部知识库片段");
+            Object docnmKwd = chunk.get("docnm_kwd");
+            if (docnmKwd != null) {
+                remark.append(" | 文档: ").append(docnmKwd);
+            }
+            Object available = chunk.get("available");
+            if (available != null) {
+                remark.append(" | 可用: ").append(available);
+            }
+            vo.setRemark(remark.toString());
+
+            result.add(vo);
         }
 
         return result;
