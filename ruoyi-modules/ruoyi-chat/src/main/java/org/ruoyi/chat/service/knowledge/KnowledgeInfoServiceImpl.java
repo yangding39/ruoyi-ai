@@ -257,8 +257,19 @@ public class KnowledgeInfoServiceImpl implements IKnowledgeInfoService {
 
         check(knowledgeInfo);
         map.put("kid", knowledgeInfo.getKid());
-        // 删除向量数据
-        vectorStoreService.removeById(String.valueOf(knowledgeInfo.getId()), knowledgeInfo.getVectorModelName());
+
+        // 如果是外部知识库，删除绑定关系
+        if (KnowledgeProviderType.EXTERNAL.equals(knowledgeInfo.getProvider())) {
+            ExternalKnowledgeBinding binding = externalKnowledgeBindingMapper.selectByDatasetId(knowledgeInfo.getId());
+            if (binding != null) {
+                externalKnowledgeBindingMapper.deleteById(binding.getId());
+                log.info("删除外部知识库绑定成功: datasetId={}, bindingId={}", knowledgeInfo.getId(), binding.getId());
+            }
+        } else {
+            // 本地知识库：删除向量数据
+            vectorStoreService.removeById(String.valueOf(knowledgeInfo.getId()), knowledgeInfo.getVectorModelName());
+        }
+
         // 删除附件和知识片段
         fragmentMapper.deleteByMap(map);
         attachMapper.deleteByMap(map);
