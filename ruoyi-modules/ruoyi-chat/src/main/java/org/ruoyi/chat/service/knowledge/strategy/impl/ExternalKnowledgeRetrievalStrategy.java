@@ -1,6 +1,7 @@
 package org.ruoyi.chat.service.knowledge.strategy.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rometools.utils.Strings;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
@@ -155,11 +156,14 @@ public class ExternalKnowledgeRetrievalStrategy implements KnowledgeRetrievalStr
 
         // 构建检索设置
         Map<String, Object> retrievalSettings = new HashMap<>();
+        if(request.getTopK() == null || request.getTopK() <=0) {
+            retrievalSettings.put("top_k", 5);
+        }
         retrievalSettings.put("top_k", request.getTopK());
         if (request.getScoreThresholdEnabled() != null && request.getScoreThresholdEnabled()) {
             retrievalSettings.put("score_threshold", request.getScoreThreshold());
         } else {
-            retrievalSettings.put("score_threshold", 0.0);
+            retrievalSettings.put("score_threshold", 0.5);
         }
         requestBody.put("retrieval_setting", retrievalSettings);
 
