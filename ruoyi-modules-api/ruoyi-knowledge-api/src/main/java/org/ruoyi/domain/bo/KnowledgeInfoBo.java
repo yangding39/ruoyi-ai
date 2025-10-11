@@ -81,17 +81,25 @@ public class KnowledgeInfoBo extends BaseEntity {
     /**
      * 知识库中检索的条数
      */
+    @NotNull(message = "知识库中检索的条数不能为空", groups = { AddGroup.class, EditGroup.class })
     private Long retrieveLimit;
 
     /**
      * 文本块大小
      */
+    @NotNull(message = "文本块大小不能为空", groups = { AddGroup.class, EditGroup.class })
     private Long textBlockSize;
 
     /**
      * 向量库模型名称
      */
+    @NotBlank(message = "向量库不能为空", groups = { AddGroup.class, EditGroup.class })
     private String vectorModelName;
+
+    /**
+     * 向量化模型名称
+     */
+    private Long embeddingModelId;
 
     /**
      * 向量化模型名称
