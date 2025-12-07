@@ -37,6 +37,7 @@ import org.ruoyi.service.VectorStoreService;
 import org.ruoyi.chat.service.knowledge.UnifiedKnowledgeRetrievalService;
 import org.ruoyi.domain.dto.KnowledgeRetrievalRequestDTO;
 import org.ruoyi.domain.dto.KnowledgeRetrievalResponseDTO;
+import org.ruoyi.service.*;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -80,7 +81,24 @@ public class SseServiceImpl implements ISseService {
 
     // 提示词模板服务
     private final IPromptTemplateService promptTemplateService;
+    private ChatModelVo chatModelVo;
 
+    /**
+     * 获取对话标题
+     *
+     * @param str 原字符
+     * @return 截取后的字符
+     */
+    public static String getFirst10Characters(String str) {
+        // 判断字符串长度
+        if (str.length() > 10) {
+            // 如果长度大于10，截取前10个字符
+            return str.substring(0, 10);
+        } else {
+            // 如果长度不足10，返回整个字符串
+            return str;
+        }
+    }
 
     @Override
     public SseEmitter sseChat(ChatRequest chatRequest, HttpServletRequest request) {
@@ -111,7 +129,7 @@ public class SseServiceImpl implements ISseService {
                     chatSessionService.insertByBo(chatSessionBo);
                     chatRequest.setSessionId(chatSessionBo.getId());
                 }
-                
+
                 // 保存用户消息
                 chatCostService.saveMessage(chatRequest);
             }
@@ -195,23 +213,6 @@ public class SseServiceImpl implements ISseService {
             throw new IllegalStateException("未找到" + category + "分类的模型配置");
         }
         return model;
-    }
-
-    /**
-     * 获取对话标题
-     *
-     * @param str 原字符
-     * @return 截取后的字符
-     */
-    public static String getFirst10Characters(String str) {
-        // 判断字符串长度
-        if (str.length() > 10) {
-            // 如果长度大于10，截取前10个字符
-            return str.substring(0, 10);
-        } else {
-            // 如果长度不足10，返回整个字符串
-            return str;
-        }
     }
 
     /**

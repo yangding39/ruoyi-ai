@@ -1,7 +1,6 @@
 package org.ruoyi.chat.controller.knowledge;
 
 import cn.dev33.satoken.stp.StpUtil;
-import io.swagger.v3.oas.annotations.Operation;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
