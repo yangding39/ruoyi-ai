@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.ruoyi.constant.KnowledgeProviderType;
 import org.ruoyi.core.domain.BaseEntity;
 
 import java.io.Serial;
@@ -42,6 +43,11 @@ public class KnowledgeInfo extends BaseEntity {
      * 知识库名称
      */
     private String kname;
+
+    /**
+     * 知识库提供商类型
+     */
+    private KnowledgeProviderType provider;
 
     /**
      * 是否公开知识库（0 否 1是）

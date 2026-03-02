@@ -21,7 +21,9 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class BillingChatServiceProxy implements IChatService {
 
+    @Autowired
     private final IChatService delegate;
+    @Autowired
     private final IChatCostService chatCostService;
 
     @Override

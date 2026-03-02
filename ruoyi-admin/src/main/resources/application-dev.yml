@@ -15,9 +15,9 @@ spring:
         master:
           type: ${spring.datasource.type}
           driverClassName: com.mysql.cj.jdbc.Driver
-          url: jdbc:mysql://127.0.0.1:3306/ruoyi-ai?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&autoReconnect=true&rewriteBatchedStatements=true
+          url: jdbc:mysql://114.132.243.166:3306/ruoyi-ai?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&autoReconnect=true&rewriteBatchedStatements=true
           username: root
-          password: root
+          password: e78a81d9169860f0
 
       hikari:
         # 最大连接池数量
@@ -36,22 +36,22 @@ spring:
         connectionTestQuery: SELECT 1
         # 多久检查一次连接的活性
         keepaliveTime: 30000
-  mail:
-    username: xx
+    mail:
+      username: xx
 
---- # redis 单机配置(单机与集群只能开启一个另一个需要注释掉)
+   # redis 单机配置(单机与集群只能开启一个另一个需要注释掉)
 spring.data:
-  redis:
-    # 地址
-    host: 127.0.0.1
-    # 端口，默认为6379
-    port: 6379
-    # 数据库索引
-    database: 0
-    # 密码(如没有密码请注释掉)
-    # password: 123456
-    # 连接超时时间
-    timeout: 10S
+    redis:
+      # 地址
+      host: 114.132.243.166
+      # 端口，默认为6379
+      port: 6379
+      # 数据库索引
+      database: 2
+      # 密码(如没有密码请注释掉)
+      password: infini_rag_flow
+      # 连接超时时间
+      timeout: 10S
 redisson:
   # redis key前缀
   keyPrefix:
